@@ -81,6 +81,7 @@ public:
 	
 protected:
 	static bool unzipTo(const std::string& zipPath, const std::string& dstDir);
+	static bool downloadWithCurl(const std::string& url, const std::string& dstPath, int timeoutSeconds);
 	static std::string findPathContainingExtRecursive( const std::string& root, const std::string& ext, int depth, int maxDepth = 6);
 	static std::string hashString(const std::string& s);
 	

@@ -83,14 +83,19 @@ std::string ofxRtmModelLoader::loadModel(const std::string& aTag, const std::str
 	req.method = ofHttpRequest::GET;
 	ofHttpResponse res = floader.handleRequest(req);
 	
-	if (res.status != 200) {
-		ofLogError("ofxRtmModelLoader::loadModel") << "Download failed";
-		return "";
-	}
-	
-	if(!ofBufferToFile(zipPath, res.data, true)) {
-		ofLogError("ofxRtmModelLoader::loadModel") << "Buffer to file Failed at" << zipPath;
-		return "";
+	if (res.status == 200) {
+		if(!ofBufferToFile(zipPath, res.data, true)) {
+			ofLogError("ofxRtmModelLoader::loadModel") << "Buffer to file Failed at" << zipPath;
+			return "";
+		}
+	} else {
+		ofLogWarning("ofxRtmModelLoader::loadModel") << "Download failed: status " << res.status << " " << res.error;
+		// OF's loader can fail on HTTPS where the system's curl works (a makefile build on macOS gives libcurl
+		// no CA certificates), so try that, the same way unzipTo() uses the system's unzip.
+		if (!downloadWithCurl(modelUrl, zipPath, req.timeoutSeconds)) {
+			ofLogError("ofxRtmModelLoader::loadModel") << "Download failed, also with curl: " << modelUrl;
+			return "";
+		}
 	}
 	
 	std::string modelDir = ofToDataPath(ofFilePath::addTrailingSlash(modelsDir)+"m"+id, true);
@@ -123,6 +128,19 @@ std::string ofxRtmModelLoader::loadModel(const std::string& aTag, const std::str
 	}
 	
 	return modelPath;
+}
+
+//--------------------------------------------------------------
+bool ofxRtmModelLoader::downloadWithCurl(const std::string& url, const std::string& dstPath, int timeoutSeconds) {
+#if defined(TARGET_OSX) || defined(TARGET_LINUX)
+	std::string cmd = "curl -fsSL";
+	if (timeoutSeconds > 0) cmd += " -m " + ofToString(timeoutSeconds);
+	cmd += " -o \"" + dstPath + "\" \"" + url + "\"";
+	ofLogNotice("ofxRtmModelLoader::downloadWithCurl") << "downloading with the system's curl";
+	return system(cmd.c_str()) == 0;
+#else
+	return false;
+#endif
 }
 
 //--------------------------------------------------------------
